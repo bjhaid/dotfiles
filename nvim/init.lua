@@ -70,7 +70,7 @@ vim.opt.undofile = true
 require("mason").setup()
 -- https://github.com/williamboman/mason-lspconfig.nvim/blob/25c11854aa25558ee6c03432edfa0df0217324be/README.md#available-lsp-servers
 require("mason-lspconfig").setup {
-  ensure_installed = { "lua_ls", "gopls", "elixirls", "bashls", "terraformls", "kotlin_language_server", "jsonnet_ls", "yamlls", "helm_ls" }
+  ensure_installed = { "lua_ls", "gopls", "elixirls", "bashls", "terraformls", "kotlin_language_server", "jsonnet_ls", "yamlls", "helm_ls", "starpls" }
 }
 require("mason-lspconfig").setup_handlers {
   function(server_name)
