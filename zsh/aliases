@@ -1,0 +1,89 @@
+alias grep='grep --color'
+alias g="git"
+alias gt="git status"
+alias gb="git branch -vv"
+alias gd="git diff"
+alias gdno="git diff --name-only"
+alias gh="git hist -20"
+alias gca="git commit --all"
+alias gitopen='nvim $(git status -s | awk '"'"'{print $2}'"'"')'
+alias gr="git reset"
+alias gs="git status"
+alias gl="git log"
+alias glo="git log --oneline"
+alias ls='ls -F -G'
+
+ressh() {
+  for agent_sock in /tmp/ssh-*/agent.*; do
+    [ ! -S "$agent_sock" ] && continue
+
+    env SSH_AUTH_SOCK="$agent_sock" timeout 1 ssh-add -L &> /dev/null
+    CODE="$?"
+
+    if [ "$CODE" = 2 ]; then
+      rm -rf "$agent_sock" &> /dev/null
+    elif [ "$CODE" = 0 ]; then
+      export SSH_AUTH_SOCK="${agent_sock}"
+      echo "export SSH_AUTH_SOCK=${agent_sock}"
+    fi
+  done
+
+  echo ""
+  ssh-add -l 2>/dev/null
+}
+
+alias print256colors='(x=`tput op` y=`printf %80s`;for i in {0..256};do o=00$i;echo -e ${o:${#o}-3:3} `tput setaf $i;tput setab $i`${y// /=}$x;done)'
+
+alias fixtmux="pkill -SIGWINCH -f tmux"
+
+k8s_context() {
+  if [[ ! -f ${HOME}/.kube/config ]]; then
+    return
+  else
+    kubectl config get-contexts | awk '$1 == "*" {print "(k8s " ((length($5)==0)?"default":$5) "@" $3 ")"}'
+  fi
+}
+alias k8s-context=k8s_context
+
+
+tmux-start() {
+  local session=$1
+  [ -z "$session" ] && session=`whoami`
+  tmux -S /tmp/$session new-session -s $session -d
+  chmod 777 /tmp/$session
+  tmux -S /tmp/$session attach -t $session
+}
+
+tmux-join() {
+  local session=$1
+  [ -z "$session" ] && session="pair"
+  tmux -S /tmp/$1 new-session -t $1
+}
+
+tmux-start-cc() {
+  local session=$1
+  [ -z "$session" ] && session=`whoami`
+  tmux -S /tmp/$session new-session -s $session -d
+  chmod 777 /tmp/$session
+  tmux -S /tmp/$session -CC attach -t $session
+}
+
+tmux-join-cc() {
+  local session=$1
+  [ -z "$session" ] && session="pair"
+  tmux -S /tmp/$1 -CC new-session -t $1
+}
+
+tmux-list() {
+  ps -eo ruser,command | grep '[n]ew-session -s' | ruby -ne '$_ =~ /^(\w+).*-s (\w+)/; puts "#{$1} started #{$2}"'
+}
+
+tmux-watch() {
+  local session=$1
+  [ -z "$session" ] && session="pair"
+  tmux -S /tmp/$1 attach -t $1 -r
+}
+
+tag-list() {
+  git tag --list | sort --version-sort
+}

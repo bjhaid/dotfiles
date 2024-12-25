@@ -1,0 +1,59 @@
+[user]
+  email = abejideayodele@gmail.com
+  name  = Àbéjídé Àyodélé
+[color]
+  ui = auto
+[alias]
+  cm = commit -m
+  ci = commit -v
+  co = checkout
+  st = status
+  ch = cherry -v origin
+  br = branch
+  aa = add --all --verbose .
+  g = grep -I
+  addall = add -A .
+  hist = log --graph --abbrev-commit --pretty=format:'%C(red)%h%C(reset) - %s %C(green)(%cr) %C(blue)<%an>%C(magenta)%d%C(reset)'
+  oneline = log --pretty=format:\"%h %ad%x20%s%x20%x28%an%x29\" --date=short
+  current = log --pretty=format:'%ad %h %d' --abbrev-commit --date=short -1
+  cur = log --pretty=format:'%ad %h %d' --abbrev-commit --date=short -1
+  ls = ls-files
+  pr = pull --rebase
+  own = !git config --unset user.name && git config --unset user.email
+
+  # show difference between the HEAD and the index
+  staged = diff --cached
+  dc = diff --cached
+  ds = diff --staged
+
+  # show difference between working tree and the index
+  branchage = "!for i in $(git branch | perl -pe s/^..//); do echo $(git show --pretty=format:'%Cgreen%ci %Cblue%cr %Creset' $i | head -n 1)'\t'$i; done"
+
+  # show list of conflicted files
+  difflist = diff --name-only --diff-filter=U
+
+  pile = stash --include-untracked
+
+  # git notes are not automatically pushed or pulled
+  fetch-notes = fetch origin refs/notes/*:refs/notes/*
+  push-notes = push origin refs/notes/*
+
+  # show all unpushed branches
+  unpushed = log --branches --not --remotes --no-walk --decorate --oneline
+[alias "push"]
+  please = push --force-with-lease
+[push]
+  default = current
+[rebase]
+  autosquash = true
+[core]
+  autocrlf = input
+  excludesfile = ~/.gitignore
+[pager]
+  log  = diff-highlight | less
+  show = diff-highlight | less
+  diff = diff-highlight | less
+[grep]
+  lineNumber = true
+[include]
+  path = ~/.local.gitconfig
