@@ -1,6 +1,6 @@
 setup_dependencies() {
   if [[ $(uname) == "Darwin" ]]; then
-    brew install golang npm rust nvim xclip tmux
+    brew install golang npm rust nvim tmux iterm2
   fi
 }
 
