@@ -1,6 +1,6 @@
 setup_dependencies() {
   if [[ $(uname) == "Darwin" ]]; then
-    brew install golang npm rust nvim
+    brew install golang npm rust nvim xclip tmux
   fi
 }
 
@@ -31,11 +31,21 @@ setup_nvim() {
 	ln -s $PWD/nvim ~/.config/nvim
 }
 
+setup_tmux() {
+  rm -rf ~/.tmux.conf
+  ln -s $PWD/tmux/tmux.conf ~/.tmux.conf
+
+  rm -rf ~/.tmux/plugins
+  mkdir -p ~/.tmux/plugins
+  git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+}
+
 _main() {
   setup_dependencies
   setup_zsh
   setup_gitconfig
 	setup_nvim
+  setup_tmux
 }
 
 _main
