@@ -27,6 +27,7 @@ setup_zsh() {
 
   rm -rf ~/.gorc
   ln -s "$PWD/zsh/gorc" ~/.gorc
+  echo 'source <(kubectl completion zsh)' >~/.zshrc.d/kubectl-completion
 }
 
 setup_nvim() {
