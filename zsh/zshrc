@@ -143,6 +143,8 @@ for file in $(find ~/.zshrc.d -type f -or -type l) ; do
 done
 
 [[ -s "$HOME/.gorc" ]] && source "$HOME/.gorc"
+export NVM_DIR="$HOME/.nvm"
+[[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
 
 
 # This makes Control+U delete all characters before the cursor
@@ -155,3 +157,7 @@ my-backward-kill-word() {
 }
 zle -N my-backward-kill-word
 bindkey '^W' my-backward-kill-word
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion

@@ -8,6 +8,14 @@ setup_dependencies() {
   fi
 }
 
+setup_nvm() {
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  nvm install --lts
+  nvm use 'lts/*'
+}
+
 setup_gitconfig() {
   mkdir -p ~/.local
   pip3 install --prefix ~/.local diff-highlight
@@ -49,6 +57,7 @@ _main() {
   setup_dependencies
   setup_zsh
   setup_gitconfig
+  setup_nvm
   setup_nvim
   setup_tmux
 }
