@@ -104,7 +104,8 @@ setopt prompt_subst
 setopt HIST_IGNORE_DUPS
 setopt SHARE_HISTORY
 setopt INC_APPEND_HISTORY
-export HISTSIZE=20000
+setopt HIST_EXPIRE_DUPS_FIRST
+export HISTSIZE=40000
 export HISTFILE=~/.zsh_history
 export SAVEHIST=20000
 
