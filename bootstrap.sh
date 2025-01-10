@@ -4,8 +4,13 @@ setup_dependencies() {
   if [[ $(uname) == "Darwin" ]]; then
     brew install \
       golang npm rust nvim tmux iterm2 \
-      mike-engel/jwt-cli/jwt-cli staticcheck
+      mike-engel/jwt-cli/jwt-cli staticcheck \
+      ripgrep fd bat fzf
+  else
+    sudo apt update && sudo apt install -y \
+      tmux nvim fd-find ripgrep bat fzf
   fi
+  cargo install git-delta
 }
 
 setup_nvm() {

@@ -29,6 +29,7 @@ Plug('junegunn/fzf', {
   end
 })
 Plug('ibhagwan/fzf-lua', { ['branch'] = 'main' })
+Plug('mfussenegger/nvim-dap') -- dependency for fzf-lua
 Plug('williamboman/mason.nvim')
 Plug('williamboman/mason-lspconfig.nvim')
 Plug('neovim/nvim-lspconfig')
