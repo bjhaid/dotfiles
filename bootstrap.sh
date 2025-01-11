@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 
 setup_dependencies() {
   if [[ $(uname) == "Darwin" ]]; then
@@ -41,6 +41,7 @@ setup_zsh() {
   rm -rf ~/.gorc
   ln -s "$PWD/zsh/gorc" ~/.gorc
   echo 'source <(kubectl completion zsh)' >~/.zshrc.d/kubectl-completion
+  echo 'source <(fzf --zsh)' >~/.zshrc.d/fzf-completion
 }
 
 setup_nvim() {

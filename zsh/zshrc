@@ -123,6 +123,7 @@ export PIPENV_MAX_DEPTH=10
 
 export PATH="$PATH:/usr/local/share/npm/bin"
 export PATH="$PATH:$HOME/.local/bin"
+export PATH="$PATH:$HOME/.cargo/bin"
 
 autoload edit-command-line
 zle -N edit-command-line
