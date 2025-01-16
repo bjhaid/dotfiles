@@ -3,14 +3,21 @@
 setup_dependencies() {
   if [[ $(uname) == "Darwin" ]]; then
     brew install \
-      golang npm rust nvim tmux iterm2 \
+      golang npm nvim tmux iterm2 \
       mike-engel/jwt-cli/jwt-cli staticcheck \
       ripgrep fd bat fzf
   else
     sudo apt update && sudo apt install -y \
       tmux nvim fd-find ripgrep bat fzf
   fi
+
+  setup_rust
   cargo install git-delta
+}
+
+setup_rust() {
+  curl -o /tmp/rustup.sh --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs
+  sh /tmp/rustup.sh -y
 }
 
 setup_nvm() {
