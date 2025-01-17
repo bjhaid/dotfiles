@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 
 setup_dependencies() {
+  mkdir -p ~/.local/bin
+
   if [[ $(uname) == "Darwin" ]]; then
     brew install \
       golang npm nvim tmux iterm2 \
       mike-engel/jwt-cli/jwt-cli staticcheck \
       ripgrep fd bat fzf
   else
-    sudo apt update && sudo apt install -y \
-      tmux nvim fd-find ripgrep bat fzf
+    curl -L https://github.com/junegunn/fzf/releases/download/v0.57.0/fzf-0.57.0-linux_amd64.tar.gz | tar -C ~/.local/bin -zxvf -
+    sudo apt update && sudo apt install --ignore-missing -y \
+      tmux nvim fd-find ripgrep bat
   fi
 
   setup_rust
