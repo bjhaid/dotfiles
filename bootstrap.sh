@@ -35,7 +35,8 @@ setup_gitconfig() {
   mkdir -p ~/.local
   pip3 install --prefix ~/.local diff-highlight
   mkdir -p ~/.zshrc.d
-  echo "export PYTHONPATH=~/.local/lib/python3.9/site-packages" >~/.zshrc.d/pythonpath
+  PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+  echo "export PYTHONPATH=~/.local/lib/python${PYTHON_VERSION}/site-packages" >~/.zshrc.d/pythonpath
 
   rm -rf ~/.gitconfig
   ln -s "$PWD/git/config" ~/.gitconfig
