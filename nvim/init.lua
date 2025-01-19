@@ -34,8 +34,12 @@ Plug('williamboman/mason.nvim')
 Plug('williamboman/mason-lspconfig.nvim')
 Plug('neovim/nvim-lspconfig')
 Plug('lukas-reineke/lsp-format.nvim')
-Plug('zbirenbaum/copilot.lua')
 Plug('towolf/vim-helm') -- only for helm syntax highlighting
+
+-- copilot
+Plug('zbirenbaum/copilot.lua')
+Plug('nvim-lua/plenary.nvim')
+Plug('CopilotC-Nvim/CopilotChat.nvim')
 
 vim.call('plug#end')
 
@@ -119,6 +123,11 @@ require("copilot").setup {
   filetypes = {
     ['*'] = true
   },
+}
+
+-- Copilot Chat
+require("CopilotChat").setup {
+  model = 'claude-3.5-sonnet',
 }
 
 -- Shortcuts
