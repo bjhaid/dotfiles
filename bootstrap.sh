@@ -15,7 +15,7 @@ setup_dependencies() {
   fi
 
   setup_rust
-  cargo install git-delta
+  ~/.cargo/bin/cargo install git-delta
 }
 
 setup_rust() {
