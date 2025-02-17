@@ -2,27 +2,24 @@ local vim = vim
 vim.cmd [[colorscheme vibrantink]]
 
 -- Force filetype detection for helm templates.
-vim.api.nvim_create_autocmd({ 'BufNewFile', 'BufRead' }, {
-  pattern = { '*/templates/*.yaml', '*/templates/*.tpl', '*.gotmpl', 'helmfile*.yaml' },
-  callback = function()
-    vim.opt_local.filetype = 'helm'
-  end
+vim.filetype.add({
+  extension = {
+    gotmpl = 'gotmpl',
+  },
+  pattern = {
+    [".*/templates/.*%.tpl"] = "helm",
+    [".*/templates/.*%.ya?ml"] = "helm",
+    ["helmfile.*%.ya?ml"] = "helm",
+  },
 })
 
 local Plug = vim.fn['plug#']
 vim.call('plug#begin')
 
-Plug('ekalinin/Dockerfile.vim')
-Plug('elixir-lang/vim-elixir')
 Plug('google/vim-jsonnet')
-Plug('hashivim/vim-terraform')
-Plug('jparise/vim-graphql')
-Plug('jtratner/vim-flavored-markdown')
 Plug('pgr0ss/vim-github-url')
 Plug('scrooloose/nerdtree')
 Plug('tpope/vim-surround')
-Plug('uarun/vim-protobuf')
-Plug('mhinz/vim-mix-format')
 Plug('junegunn/fzf', {
   ['do'] = function()
     vim.fn['fzf#install']()
@@ -34,7 +31,11 @@ Plug('williamboman/mason.nvim')
 Plug('williamboman/mason-lspconfig.nvim')
 Plug('neovim/nvim-lspconfig')
 Plug('lukas-reineke/lsp-format.nvim')
-Plug('towolf/vim-helm') -- only for helm syntax highlighting
+Plug('nvim-treesitter/nvim-treesitter', {
+  ['do'] = function()
+    vim.cmd('TSUpdate')
+  end
+})
 
 -- copilot
 Plug('zbirenbaum/copilot.lua')
@@ -122,6 +123,16 @@ require("copilot").setup {
   },
   filetypes = {
     ['*'] = true
+  },
+}
+
+-- Treesitter setup
+require 'nvim-treesitter.configs'.setup {
+  ensure_installed = { "bash", "diff", "dockerfile", "elixir", "go", "kotlin", "lua", "rego", "terraform" },
+  auto_install = true,
+  highlight = {
+    enable = true,
+    additional_vim_regex_highlighting = false,
   },
 }
 
