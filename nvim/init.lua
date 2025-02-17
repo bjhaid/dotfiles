@@ -1,5 +1,6 @@
 local vim = vim
 vim.cmd [[colorscheme vibrantink]]
+vim.lsp.set_log_level 'debug'
 
 -- Force filetype detection for helm templates.
 vim.filetype.add({
@@ -78,17 +79,10 @@ require("mason").setup()
 require("mason-lspconfig").setup {
   ensure_installed = { "lua_ls", "gopls", "elixirls", "bashls", "terraformls", "kotlin_language_server", "jsonnet_ls", "yamlls", "helm_ls", "starpls" }
 }
+
 require("mason-lspconfig").setup_handlers {
   function(server_name)
     require("lspconfig")[server_name].setup {
-      settings = {
-        ['helm-ls'] = {
-          filetypes = { "helm" },
-          yamlls = {
-            path = vim.fn.stdpath("data") .. "/mason/bin/yaml-language-server",
-          },
-        },
-      },
 
       on_attach = function(client, buf)
         vim.keymap.set("n", "gD", vim.lsp.buf.declaration, { buffer = buf, desc = "Go to Declaration" })
@@ -108,6 +102,23 @@ require("mason-lspconfig").setup_handlers {
       end,
     }
   end,
+}
+
+local lspconfig = require('lspconfig')
+
+lspconfig.helm_ls.setup {
+  settings = {
+    ['helm-ls'] = {
+      yamlls = {
+        path = vim.fn.stdpath("data") .. "/mason/bin/yaml-language-server",
+      }
+    }
+  }
+}
+
+lspconfig.kotlin_language_server.setup {
+  cmd = { "/Users/bjhaid/Downloads/server/bin/kotlin-language-server" },
+  root_dir = vim.fs.dirname(vim.fs.find({ "BUILD.Bazel" }, { upward = true })[1])
 }
 --vim.lsp.set_log_level("debug")
 
