@@ -60,3 +60,5 @@
   lineNumber = true
 [include]
   path = ~/.local.gitconfig
+[url "ssh://git@github.com/"]
+	insteadOf = https://github.com/
