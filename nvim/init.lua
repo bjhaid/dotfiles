@@ -147,6 +147,7 @@ require("CopilotChat").setup {
 vim.keymap.set('n', '<LocalLeader>nt', ':NERDTreeToggle<CR>', { silent = true })
 vim.keymap.set('n', '<LocalLeader>nr', ':NERDTree<CR>', { silent = true })
 vim.keymap.set('n', '<LocalLeader>nf', ':NERDTreeFind<CR>', { silent = true })
+vim.keymap.set({ 'n', 'v' }, '<LocalLeader>cw', ':%s/\\s\\+$//e<CR>', { desc = "Remove trailing whitespace" })
 
 -- FZF
 vim.keymap.set("n", "<LocalLeader>ff", ':FzfLua git_files<CR>', { desc = "Fzf Git Files" })
