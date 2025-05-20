@@ -73,43 +73,42 @@ vim.opt.undodir = vim.fn.stdpath("data") .. "/undo"
 vim.opt.undofile = true
 
 -- LSP
-require("mason").setup()
 -- https://github.com/williamboman/mason-lspconfig.nvim/blob/25c11854aa25558ee6c03432edfa0df0217324be/README.md#available-lsp-servers
+local servers = { "lua_ls", "gopls", "elixirls", "bashls", "terraformls", "kotlin_language_server", "jsonnet_ls",
+  "yamlls", "helm_ls", "starpls" }
+
+require("mason").setup()
 require("mason-lspconfig").setup {
-  ensure_installed = { "lua_ls", "gopls", "elixirls", "bashls", "terraformls", "kotlin_language_server", "jsonnet_ls", "yamlls", "helm_ls", "starpls" }
+  ensure_installed = servers
 }
-require("mason-lspconfig").setup_handlers {
-  function(server_name)
-    require("lspconfig")[server_name].setup {
-      settings = {
-        ['helm-ls'] = {
-          filetypes = { "helm" },
-          yamlls = {
-            path = vim.fn.stdpath("data") .. "/mason/bin/yaml-language-server",
-          },
-        },
-      },
+require("lsp-format").setup {}
 
-      on_attach = function(client, buf)
-        vim.keymap.set("n", "gD", vim.lsp.buf.declaration, { buffer = buf, desc = "Go to Declaration" })
-        vim.keymap.set("n", "gd", vim.lsp.buf.definition, { buffer = buf, desc = "Go to Definition" })
-        vim.keymap.set("n", "K", vim.lsp.buf.hover, { buffer = buf, desc = "LSP Hover" })
-        vim.keymap.set("n", "gi", vim.lsp.buf.implementation, { buffer = buf, desc = "Go to Implementation" })
-        vim.keymap.set("n", "<C-k>", vim.lsp.buf.signature_help, { buffer = buf, desc = "Signature Help" })
-        vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, { buffer = buf, desc = "Rename Symbol" })
-        vim.keymap.set("n", "gr", vim.lsp.buf.references, { buffer = buf, desc = "Symbol References" })
-        vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, { buffer = buf, desc = "Code Action" })
-        vim.keymap.set("n", "[d", vim.diagnostic.goto_prev, { buffer = buf, desc = "Go to Next Diagnostic" })
-        vim.keymap.set("n", "gl", vim.diagnostic.open_float, { buffer = buf, desc = "Open Diagnostic Float" })
-        vim.keymap.set("n", "]d", vim.diagnostic.goto_next, { buffer = buf, desc = "Go to Previous Diagnostic" })
-        vim.keymap.set("n", "<leader>q", vim.diagnostic.setloclist, { buffer = buf, desc = "Diagnostic to local list" })
+-- LSP Server configurations
+local lspconfig = require('lspconfig')
+for _, lsp in ipairs(servers) do
+  lspconfig[lsp].setup {
+    on_attach = on_attach,
+    capabilities = capabilities,
+  }
+end
 
-        require("lsp-format").on_attach(client, buf) -- format on save
-      end,
-    }
-  end,
-}
 --vim.lsp.set_log_level("debug")
+local on_attach = function(client, buf)
+  vim.keymap.set("n", "gD", vim.lsp.buf.declaration, { buffer = buf, desc = "Go to Declaration" })
+  vim.keymap.set("n", "gd", vim.lsp.buf.definition, { buffer = buf, desc = "Go to Definition" })
+  vim.keymap.set("n", "K", vim.lsp.buf.hover, { buffer = buf, desc = "LSP Hover" })
+  vim.keymap.set("n", "gi", vim.lsp.buf.implementation, { buffer = buf, desc = "Go to Implementation" })
+  vim.keymap.set("n", "<C-k>", vim.lsp.buf.signature_help, { buffer = buf, desc = "Signature Help" })
+  vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, { buffer = buf, desc = "Rename Symbol" })
+  vim.keymap.set("n", "gr", vim.lsp.buf.references, { buffer = buf, desc = "Symbol References" })
+  vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, { buffer = buf, desc = "Code Action" })
+  vim.keymap.set("n", "[d", vim.diagnostic.goto_prev, { buffer = buf, desc = "Go to Next Diagnostic" })
+  vim.keymap.set("n", "gl", vim.diagnostic.open_float, { buffer = buf, desc = "Open Diagnostic Float" })
+  vim.keymap.set("n", "]d", vim.diagnostic.goto_next, { buffer = buf, desc = "Go to Previous Diagnostic" })
+  vim.keymap.set("n", "<leader>q", vim.diagnostic.setloclist, { buffer = buf, desc = "Diagnostic to local list" })
+
+  require("lsp-format").on_attach(client, buf) -- format on save
+end
 
 --CoPilot
 require("copilot").setup {
