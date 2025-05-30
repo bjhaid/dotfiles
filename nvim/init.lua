@@ -27,9 +27,9 @@ Plug('junegunn/fzf', {
 })
 Plug('ibhagwan/fzf-lua', { ['branch'] = 'main' })
 Plug('mfussenegger/nvim-dap') -- dependency for fzf-lua
-Plug('williamboman/mason.nvim')
-Plug('williamboman/mason-lspconfig.nvim')
 Plug('neovim/nvim-lspconfig')
+Plug('mason-org/mason.nvim')
+Plug('mason-org/mason-lspconfig.nvim')
 Plug('lukas-reineke/lsp-format.nvim')
 Plug('nvim-treesitter/nvim-treesitter', {
   ['do'] = function()
@@ -72,7 +72,7 @@ vim.opt.updatetime = 200
 vim.opt.undodir = vim.fn.stdpath("data") .. "/undo"
 vim.opt.undofile = true
 
--- LSP
+-- LSP Server configurations
 -- https://github.com/williamboman/mason-lspconfig.nvim/blob/25c11854aa25558ee6c03432edfa0df0217324be/README.md#available-lsp-servers
 local servers = { "lua_ls", "gopls", "elixirls", "bashls", "terraformls", "kotlin_language_server", "jsonnet_ls",
   "yamlls", "helm_ls", "starpls" }
@@ -81,34 +81,42 @@ require("mason").setup()
 require("mason-lspconfig").setup {
   ensure_installed = servers
 }
-require("lsp-format").setup {}
+vim.lsp.config('elixirls', {
+  cmd = { "~/.local/share/nvim/mason/packages/elixir-ls/language_server.sh" },
+})
 
--- LSP Server configurations
-local lspconfig = require('lspconfig')
-for _, lsp in ipairs(servers) do
-  lspconfig[lsp].setup {
-    on_attach = on_attach,
-    capabilities = capabilities,
-  }
-end
+vim.opt.rtp:append("/home/owner/src/kotlin-bazel.nvim")
+require('kotlin_bazel').setup()
 
---vim.lsp.set_log_level("debug")
+-- vim.lsp.set_log_level("debug")
+
 local on_attach = function(client, buf)
-  vim.keymap.set("n", "gD", vim.lsp.buf.declaration, { buffer = buf, desc = "Go to Declaration" })
-  vim.keymap.set("n", "gd", vim.lsp.buf.definition, { buffer = buf, desc = "Go to Definition" })
+  vim.keymap.set("n", "<leader>gD", vim.lsp.buf.declaration, { buffer = buf, desc = "Go to Declaration" })
+  vim.keymap.set("n", "<leader>gd", vim.lsp.buf.definition, { buffer = buf, desc = "Go to Definition" })
   vim.keymap.set("n", "K", vim.lsp.buf.hover, { buffer = buf, desc = "LSP Hover" })
-  vim.keymap.set("n", "gi", vim.lsp.buf.implementation, { buffer = buf, desc = "Go to Implementation" })
+  vim.keymap.set("n", "<leader>gi", vim.lsp.buf.implementation, { buffer = buf, desc = "Go to Implementation" })
   vim.keymap.set("n", "<C-k>", vim.lsp.buf.signature_help, { buffer = buf, desc = "Signature Help" })
   vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, { buffer = buf, desc = "Rename Symbol" })
-  vim.keymap.set("n", "gr", vim.lsp.buf.references, { buffer = buf, desc = "Symbol References" })
+  vim.keymap.set("n", "<leader>gr", vim.lsp.buf.references, { buffer = buf, desc = "Symbol References" })
   vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, { buffer = buf, desc = "Code Action" })
   vim.keymap.set("n", "[d", vim.diagnostic.goto_prev, { buffer = buf, desc = "Go to Next Diagnostic" })
-  vim.keymap.set("n", "gl", vim.diagnostic.open_float, { buffer = buf, desc = "Open Diagnostic Float" })
+  vim.keymap.set("n", "<leader>gl", vim.diagnostic.open_float, { buffer = buf, desc = "Open Diagnostic Float" })
   vim.keymap.set("n", "]d", vim.diagnostic.goto_next, { buffer = buf, desc = "Go to Previous Diagnostic" })
   vim.keymap.set("n", "<leader>q", vim.diagnostic.setloclist, { buffer = buf, desc = "Diagnostic to local list" })
 
   require("lsp-format").on_attach(client, buf) -- format on save
 end
+
+vim.lsp.config('*', {
+  on_attach = on_attach,
+  capabilities = {
+    textDocument = {
+      semanticTokens = {
+        multilineTokenSupport = true,
+      }
+    }
+  },
+})
 
 --CoPilot
 require("copilot").setup {
