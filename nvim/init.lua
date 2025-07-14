@@ -85,8 +85,10 @@ vim.lsp.config('elixirls', {
   cmd = { "~/.local/share/nvim/mason/packages/elixir-ls/language_server.sh" },
 })
 
-vim.opt.rtp:append("/home/owner/src/kotlin-bazel.nvim")
-require('kotlin_bazel').setup()
+if vim.fn.isdirectory("/home/owner/src/kotlin-bazel.nvim") ~= 0 then
+  vim.opt.rtp:append("/home/owner/src/kotlin-bazel.nvim")
+  require('kotlin_bazel').setup()
+end
 
 -- vim.lsp.set_log_level("debug")
 
