@@ -56,6 +56,7 @@ setup_zsh() {
 }
 
 setup_nvim() {
+  cargo install --locked tree-sitter-cli
   mkdir -p ~/.config
   rm -rf ~/.config/nvim
   ln -s "$PWD/nvim" ~/.config/nvim

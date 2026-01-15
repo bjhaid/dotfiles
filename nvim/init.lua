@@ -38,7 +38,6 @@ Plug('nvim-treesitter/nvim-treesitter', {
 })
 
 -- copilot
-Plug('zbirenbaum/copilot.lua')
 Plug('nvim-lua/plenary.nvim')
 Plug('CopilotC-Nvim/CopilotChat.nvim')
 
@@ -120,30 +119,8 @@ vim.lsp.config('*', {
   },
 })
 
---CoPilot
-require("copilot").setup {
-  suggestion = {
-    auto_trigger = true,
-    enabled = true,
-    keymap = {
-      accept = "<Tab>",
-      dismiss = "<C-]>",
-    },
-  },
-  filetypes = {
-    ['*'] = true
-  },
-}
-
 -- Treesitter setup
-require 'nvim-treesitter.configs'.setup {
-  ensure_installed = { "bash", "diff", "dockerfile", "elixir", "go", "kotlin", "lua", "rego", "terraform" },
-  auto_install = true,
-  highlight = {
-    enable = true,
-    additional_vim_regex_highlighting = false,
-  },
-}
+require 'nvim-treesitter'.install { "bash", "diff", "dockerfile", "elixir", "go", "kotlin", "lua", "rego", "terraform" }
 
 -- Copilot Chat
 require("CopilotChat").setup {
