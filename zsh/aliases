@@ -1,17 +1,5 @@
 alias grep='grep --color'
-alias g="git"
-alias gt="git status"
-alias gb="git branch -vv"
-alias gd="git diff"
-alias gdno="git diff --name-only"
-alias gh="git hist -20"
-alias gca="git commit --all"
 alias gitopen='nvim $(git status -s | awk '"'"'{print $2}'"'"')'
-alias gr="git reset"
-alias gs="git status"
-alias gl="git log"
-alias glo="git log --oneline"
-alias ls='ls -F -G'
 
 ressh() {
   for agent_sock in /tmp/ssh-*/agent.*; do
