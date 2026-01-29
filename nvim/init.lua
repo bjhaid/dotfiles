@@ -120,7 +120,12 @@ vim.lsp.config('*', {
 })
 
 -- Treesitter setup
-require 'nvim-treesitter'.install { "bash", "diff", "dockerfile", "elixir", "go", "kotlin", "lua", "rego", "terraform" }
+local treesitter_parsers = { "bash", "diff", "dockerfile", "elixir", "go", "kotlin", "lua", "rego", "terraform" }
+require 'nvim-treesitter'.install(treesitter_parsers)
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = treesitter_parsers,
+  callback = function() vim.treesitter.start() end,
+})
 
 -- Copilot Chat
 require("CopilotChat").setup {
