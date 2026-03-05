@@ -1,0 +1,643 @@
+---
+- name: Bootstrap dotfiles
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    dotfiles_root: "{{ dotfiles_root | default(playbook_dir | dirname) }}"
+    home_dir: "{{ ansible_facts['env']['HOME'] }}"
+
+  tasks:
+    - name: Ensure base local directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ home_dir }}/.local"
+        - "{{ home_dir }}/.local/bin"
+        - "{{ home_dir }}/.zshrc.d"
+        - "{{ home_dir }}/.config"
+
+    - name: Install macOS dependencies with brew
+      ansible.builtin.command:
+        argv:
+          - brew
+          - install
+          - golang
+          - npm
+          - tmux
+          - iterm2
+          - gnu-tar
+          - staticcheck
+          - ripgrep
+          - fd
+          - bat
+          - fzf
+      when: ansible_facts.system == "Darwin"
+      changed_when: false
+
+    - name: Update apt cache
+      ansible.builtin.command:
+        argv:
+          - apt-get
+          - update
+      become: true
+      changed_when: false
+      when:
+        - ansible_facts.system != "Darwin"
+        - not ansible_check_mode
+
+    - name: Install Linux apt dependencies
+      ansible.builtin.command:
+        argv:
+          - apt-get
+          - install
+          - --yes
+          - tmux
+          - fd-find
+          - ripgrep
+          - bat
+          - python3-pip
+          - git
+      become: true
+      changed_when: false
+      when:
+        - ansible_facts.system != "Darwin"
+        - not ansible_check_mode
+
+    - name: Note skipped apt tasks in check mode
+      ansible.builtin.debug:
+        msg: "Skipping apt package install in dry-run mode."
+      when:
+        - ansible_facts.system != "Darwin"
+        - ansible_check_mode
+
+    - name: Detect Linux libc family and version
+      ansible.builtin.shell: |
+        set -euo pipefail
+        ldd_line="$(ldd --version 2>&1 | head -n1 || true)"
+        if echo "$ldd_line" | grep -qi musl; then
+          libc_family="musl"
+        else
+          libc_family="glibc"
+        fi
+        libc_version="$(echo "$ldd_line" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || true)"
+        printf '%s %s\n' "$libc_family" "${libc_version:-unknown}"
+      args:
+        executable: /bin/bash
+      register: jwt_linux_libc
+      changed_when: false
+      check_mode: false
+      when: ansible_facts.system == "Linux"
+
+    - name: Fetch latest Neovim release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/neovim/neovim/releases/latest
+        return_content: true
+      register: neovim_release
+      changed_when: false
+      check_mode: false
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Set Neovim host asset facts
+      ansible.builtin.set_fact:
+        neovim_version: "{{ neovim_release.json.tag_name | regex_replace('^v', '') }}"
+        neovim_asset_name: "{{ 'nvim-macos-arm64.tar.gz' if (ansible_facts.system == 'Darwin' and ansible_facts.architecture in ['arm64', 'aarch64']) else ('nvim-macos-x86_64.tar.gz' if (ansible_facts.system == 'Darwin' and ansible_facts.architecture in ['x86_64', 'amd64']) else ('nvim-linux-arm64.tar.gz' if (ansible_facts.system == 'Linux' and ansible_facts.architecture in ['arm64', 'aarch64'] and jwt_linux_libc.stdout.split() | first == 'glibc') else ('nvim-linux-x86_64.tar.gz' if (ansible_facts.system == 'Linux' and ansible_facts.architecture in ['x86_64', 'amd64'] and jwt_linux_libc.stdout.split() | first == 'glibc') else 'unsupported'))) }}"
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Fail for unsupported Neovim host target
+      ansible.builtin.fail:
+        msg: >-
+          Unsupported host for Neovim prebuilt binary:
+          os={{ ansible_facts.system }}, arch={{ ansible_facts.architecture }}, libc={{ (jwt_linux_libc.stdout | default('n/a')).split() | first }}.
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - neovim_asset_name == "unsupported"
+
+    - name: Set Neovim selected release asset
+      ansible.builtin.set_fact:
+        neovim_asset: "{{ (neovim_release.json.assets | selectattr('name', 'equalto', neovim_asset_name) | list | first) }}"
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - neovim_asset_name != "unsupported"
+
+    - name: Check installed Neovim version
+      ansible.builtin.command:
+        argv:
+          - "{{ home_dir }}/.local/bin/nvim"
+          - --version
+      register: neovim_version_check
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Determine whether Neovim install/update is needed
+      ansible.builtin.set_fact:
+        neovim_install_needed: "{{ neovim_version_check.rc != 0 or ('NVIM v' ~ neovim_version) not in neovim_version_check.stdout }}"
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Create temporary directory for Neovim install
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: neovim-
+      register: neovim_tmpdir
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - neovim_install_needed
+        - not ansible_check_mode
+
+    - name: Download Neovim archive
+      ansible.builtin.get_url:
+        url: "{{ neovim_asset.browser_download_url }}"
+        dest: "{{ neovim_tmpdir.path }}/{{ neovim_asset_name }}"
+        checksum: "{{ neovim_asset.digest }}"
+        mode: "0644"
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - neovim_install_needed
+        - not ansible_check_mode
+
+    - name: Resolve Homebrew gnu-tar gnubin path
+      ansible.builtin.command:
+        argv:
+          - brew
+          - --prefix
+          - gnu-tar
+      register: brew_gnutar_prefix
+      changed_when: false
+      check_mode: false
+      when:
+        - ansible_facts.system == "Darwin"
+        - neovim_install_needed
+        - not ansible_check_mode
+
+    - name: Extract Neovim archive
+      ansible.builtin.unarchive:
+        src: "{{ neovim_tmpdir.path }}/{{ neovim_asset_name }}"
+        dest: "{{ home_dir }}/.local"
+        remote_src: true
+      environment:
+        PATH: >-
+          {{
+            ((brew_gnutar_prefix.stdout ~ '/libexec/gnubin:') if ansible_facts.system == 'Darwin' else '') ~
+            ansible_facts['env']['PATH']
+          }}
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - neovim_install_needed
+        - not ansible_check_mode
+
+    - name: Link Neovim binary into ~/.local/bin
+      ansible.builtin.file:
+        src: "{{ home_dir }}/.local/{{ neovim_asset_name | regex_replace('\\.tar\\.gz$', '') }}/bin/nvim"
+        dest: "{{ home_dir }}/.local/bin/nvim"
+        state: link
+        force: true
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - neovim_install_needed
+        - not ansible_check_mode
+
+    - name: Remove temporary directory for Neovim install
+      ansible.builtin.file:
+        path: "{{ neovim_tmpdir.path | default('/tmp') }}"
+        state: absent
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - neovim_install_needed
+        - not ansible_check_mode
+
+    - name: Verify local Neovim binary
+      ansible.builtin.command:
+        argv:
+          - "{{ home_dir }}/.local/bin/nvim"
+          - --version
+      changed_when: false
+      check_mode: false
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Set jwt-cli host libc facts
+      ansible.builtin.set_fact:
+        jwt_cli_version: "6.2.0"
+        jwt_cli_libc_family: "{{ (jwt_linux_libc.stdout | default('glibc unknown')).split() | first if ansible_facts.system == 'Linux' else 'n/a' }}"
+        jwt_cli_libc_version: "{{ (jwt_linux_libc.stdout | default('glibc unknown')).split() | last if ansible_facts.system == 'Linux' else 'n/a' }}"
+
+    - name: Set jwt-cli release asset for host
+      ansible.builtin.set_fact:
+        jwt_cli_asset_base: "{{ 'jwt-macOS' if ansible_facts.system == 'Darwin' else ('jwt-linux-musl' if (ansible_facts.system == 'Linux' and ansible_facts.architecture in ['x86_64', 'amd64'] and jwt_cli_libc_family == 'musl') else ('jwt-linux' if (ansible_facts.system == 'Linux' and ansible_facts.architecture in ['x86_64', 'amd64']) else 'unsupported')) }}"
+
+    - name: Fail for unsupported jwt-cli host target
+      ansible.builtin.fail:
+        msg: >-
+          Unsupported host for prebuilt jwt-cli binary:
+          os={{ ansible_facts.system }}, arch={{ ansible_facts.architecture }}, libc={{ jwt_cli_libc_family }} {{ jwt_cli_libc_version }}.
+          Upstream prebuilds currently support Linux x86_64 (glibc/musl) and macOS universal.
+      when: jwt_cli_asset_base == "unsupported"
+
+    - name: Check installed jwt-cli version
+      ansible.builtin.command:
+        argv:
+          - "{{ home_dir }}/.local/bin/jwt"
+          - --version
+      register: jwt_cli_version_check
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Determine whether jwt-cli install/update is needed
+      ansible.builtin.set_fact:
+        jwt_cli_install_needed: >-
+          {{
+            jwt_cli_version_check.rc != 0 or
+            (' ' ~ jwt_cli_version) not in (' ' ~ (jwt_cli_version_check.stdout ~ ' ' ~ jwt_cli_version_check.stderr))
+          }}
+
+    - name: Create temporary directory for jwt-cli install
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: jwt-cli-
+      register: jwt_cli_tmpdir
+      when:
+        - jwt_cli_install_needed
+        - not ansible_check_mode
+
+    - name: Download jwt-cli checksum file
+      ansible.builtin.get_url:
+        url: "https://github.com/mike-engel/jwt-cli/releases/download/{{ jwt_cli_version }}/{{ jwt_cli_asset_base }}.sha256"
+        dest: "{{ (jwt_cli_tmpdir.path | default('/tmp')) }}/{{ jwt_cli_asset_base }}.sha256"
+        mode: "0644"
+      when:
+        - jwt_cli_install_needed
+        - not ansible_check_mode
+
+    - name: Read jwt-cli checksum value
+      ansible.builtin.slurp:
+        src: "{{ (jwt_cli_tmpdir.path | default('/tmp')) }}/{{ jwt_cli_asset_base }}.sha256"
+      register: jwt_cli_checksum_file
+      when:
+        - jwt_cli_install_needed
+        - not ansible_check_mode
+
+    - name: Parse jwt-cli checksum value
+      ansible.builtin.set_fact:
+        jwt_cli_sha256: "{{ (jwt_cli_checksum_file.content | b64decode).split() | first }}"
+      when:
+        - jwt_cli_install_needed
+        - not ansible_check_mode
+
+    - name: Download jwt-cli archive
+      ansible.builtin.get_url:
+        url: "https://github.com/mike-engel/jwt-cli/releases/download/{{ jwt_cli_version }}/{{ jwt_cli_asset_base }}.tar.gz"
+        dest: "{{ (jwt_cli_tmpdir.path | default('/tmp')) }}/{{ jwt_cli_asset_base }}.tar.gz"
+        checksum: "sha256:{{ jwt_cli_sha256 }}"
+        mode: "0644"
+      when:
+        - jwt_cli_install_needed
+        - not ansible_check_mode
+
+    - name: Extract jwt-cli archive
+      ansible.builtin.unarchive:
+        src: "{{ (jwt_cli_tmpdir.path | default('/tmp')) }}/{{ jwt_cli_asset_base }}.tar.gz"
+        dest: "{{ jwt_cli_tmpdir.path | default('/tmp') }}"
+        remote_src: true
+      when:
+        - jwt_cli_install_needed
+        - not ansible_check_mode
+
+    - name: Install jwt-cli binary
+      ansible.builtin.copy:
+        src: "{{ (jwt_cli_tmpdir.path | default('/tmp')) }}/jwt"
+        dest: "{{ home_dir }}/.local/bin/jwt"
+        mode: "0755"
+        remote_src: true
+      when:
+        - jwt_cli_install_needed
+        - not ansible_check_mode
+
+    - name: Remove temporary directory for jwt-cli install
+      ansible.builtin.file:
+        path: "{{ jwt_cli_tmpdir.path | default('/tmp') }}"
+        state: absent
+      when:
+        - jwt_cli_install_needed
+        - not ansible_check_mode
+
+    - name: Install fzf binary on Linux
+      ansible.builtin.unarchive:
+        src: https://github.com/junegunn/fzf/releases/download/v0.57.0/fzf-0.57.0-linux_amd64.tar.gz
+        dest: "{{ home_dir }}/.local/bin"
+        remote_src: true
+        creates: "{{ home_dir }}/.local/bin/fzf"
+      when: ansible_facts.system != "Darwin"
+
+    - name: Fetch latest git-delta release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/dandavison/delta/releases/latest
+        return_content: true
+      register: delta_release
+      changed_when: false
+      check_mode: false
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Set git-delta release version
+      ansible.builtin.set_fact:
+        delta_version: "{{ delta_release.json.tag_name | regex_replace('^v', '') }}"
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Set git-delta host asset facts
+      ansible.builtin.set_fact:
+        delta_asset_name: "{{ ('delta-' ~ delta_version ~ '-aarch64-apple-darwin.tar.gz') if (ansible_facts.system == 'Darwin' and ansible_facts.architecture in ['arm64', 'aarch64']) else (('delta-' ~ delta_version ~ '-x86_64-apple-darwin.tar.gz') if (ansible_facts.system == 'Darwin' and ansible_facts.architecture in ['x86_64', 'amd64']) else (('delta-' ~ delta_version ~ '-aarch64-unknown-linux-gnu.tar.gz') if (ansible_facts.system == 'Linux' and ansible_facts.architecture in ['arm64', 'aarch64'] and jwt_linux_libc.stdout.split() | first == 'glibc') else (('delta-' ~ delta_version ~ '-x86_64-unknown-linux-musl.tar.gz') if (ansible_facts.system == 'Linux' and ansible_facts.architecture in ['x86_64', 'amd64'] and jwt_linux_libc.stdout.split() | first == 'musl') else (('delta-' ~ delta_version ~ '-x86_64-unknown-linux-gnu.tar.gz') if (ansible_facts.system == 'Linux' and ansible_facts.architecture in ['x86_64', 'amd64'] and jwt_linux_libc.stdout.split() | first == 'glibc') else 'unsupported')))) }}"
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Fail for unsupported git-delta host target
+      ansible.builtin.fail:
+        msg: >-
+          Unsupported host for git-delta prebuilt binary:
+          os={{ ansible_facts.system }}, arch={{ ansible_facts.architecture }}, libc={{ (jwt_linux_libc.stdout | default('n/a')).split() | first }}.
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - delta_asset_name == "unsupported"
+
+    - name: Set git-delta selected release asset
+      ansible.builtin.set_fact:
+        delta_asset: "{{ (delta_release.json.assets | selectattr('name', 'equalto', delta_asset_name) | list | first) }}"
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - delta_asset_name != "unsupported"
+
+    - name: Check installed git-delta version
+      ansible.builtin.command:
+        argv:
+          - "{{ home_dir }}/.local/bin/delta"
+          - --version
+      register: delta_version_check
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Determine whether git-delta install/update is needed
+      ansible.builtin.set_fact:
+        delta_install_needed: "{{ delta_version_check.rc != 0 or ('delta ' ~ delta_version) not in delta_version_check.stdout }}"
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Create temporary directory for git-delta install
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: delta-
+      register: delta_tmpdir
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - delta_install_needed
+        - not ansible_check_mode
+
+    - name: Download git-delta archive
+      ansible.builtin.get_url:
+        url: "{{ delta_asset.browser_download_url }}"
+        dest: "{{ delta_tmpdir.path }}/{{ delta_asset_name }}"
+        mode: "0644"
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - delta_install_needed
+        - not ansible_check_mode
+
+    - name: Extract git-delta archive
+      ansible.builtin.command:
+        argv:
+          - tar
+          - -xzf
+          - "{{ delta_tmpdir.path }}/{{ delta_asset_name }}"
+          - -C
+          - "{{ delta_tmpdir.path }}"
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - delta_install_needed
+        - not ansible_check_mode
+
+    - name: Install git-delta binary
+      ansible.builtin.copy:
+        src: "{{ delta_tmpdir.path }}/{{ delta_asset_name | regex_replace('\\.tar\\.gz$', '') }}/delta"
+        dest: "{{ home_dir }}/.local/bin/delta"
+        mode: "0755"
+        remote_src: true
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - delta_install_needed
+        - not ansible_check_mode
+
+    - name: Remove temporary directory for git-delta install
+      ansible.builtin.file:
+        path: "{{ delta_tmpdir.path | default('/tmp') }}"
+        state: absent
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - delta_install_needed
+        - not ansible_check_mode
+
+    - name: Verify git-delta binary
+      ansible.builtin.command:
+        argv:
+          - "{{ home_dir }}/.local/bin/delta"
+          - --version
+      changed_when: false
+      check_mode: false
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - not ansible_check_mode or delta_version_check.rc == 0
+
+    - name: Fetch latest tree-sitter release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/tree-sitter/tree-sitter/releases/latest
+        return_content: true
+      register: tree_sitter_release
+      changed_when: false
+      check_mode: false
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Set tree-sitter host asset facts
+      ansible.builtin.set_fact:
+        tree_sitter_version: "{{ tree_sitter_release.json.tag_name | regex_replace('^v', '') }}"
+        tree_sitter_asset_name: "{{ 'tree-sitter-macos-arm64.gz' if (ansible_facts.system == 'Darwin' and ansible_facts.architecture in ['arm64', 'aarch64']) else ('tree-sitter-macos-x64.gz' if (ansible_facts.system == 'Darwin' and ansible_facts.architecture in ['x86_64', 'amd64']) else ('tree-sitter-linux-arm64.gz' if (ansible_facts.system == 'Linux' and ansible_facts.architecture in ['arm64', 'aarch64']) else ('tree-sitter-linux-x64.gz' if (ansible_facts.system == 'Linux' and ansible_facts.architecture in ['x86_64', 'amd64']) else 'unsupported'))) }}"
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Fail for unsupported tree-sitter host target
+      ansible.builtin.fail:
+        msg: >-
+          Unsupported host for tree-sitter prebuilt binary:
+          os={{ ansible_facts.system }}, arch={{ ansible_facts.architecture }}.
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - tree_sitter_asset_name == "unsupported"
+
+    - name: Set tree-sitter selected release asset
+      ansible.builtin.set_fact:
+        tree_sitter_asset: "{{ (tree_sitter_release.json.assets | selectattr('name', 'equalto', tree_sitter_asset_name) | list | first) }}"
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - tree_sitter_asset_name != "unsupported"
+
+    - name: Check installed tree-sitter version
+      ansible.builtin.command:
+        argv:
+          - "{{ home_dir }}/.local/bin/tree-sitter"
+          - --version
+      register: tree_sitter_version_check
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Determine whether tree-sitter install/update is needed
+      ansible.builtin.set_fact:
+        tree_sitter_install_needed: "{{ tree_sitter_version_check.rc != 0 or ('tree-sitter ' ~ tree_sitter_version) not in tree_sitter_version_check.stdout }}"
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Create temporary directory for tree-sitter install
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: tree-sitter-
+      register: tree_sitter_tmpdir
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - tree_sitter_install_needed
+        - not ansible_check_mode
+
+    - name: Download tree-sitter binary archive
+      ansible.builtin.get_url:
+        url: "{{ tree_sitter_asset.browser_download_url }}"
+        dest: "{{ tree_sitter_tmpdir.path }}/{{ tree_sitter_asset_name }}"
+        checksum: "{{ tree_sitter_asset.digest }}"
+        mode: "0644"
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - tree_sitter_install_needed
+        - not ansible_check_mode
+
+    - name: Extract tree-sitter binary
+      ansible.builtin.shell: |
+        set -euo pipefail
+        gzip -dc "{{ tree_sitter_tmpdir.path }}/{{ tree_sitter_asset_name }}" > "{{ home_dir }}/.local/bin/tree-sitter"
+        chmod 0755 "{{ home_dir }}/.local/bin/tree-sitter"
+      args:
+        executable: /bin/bash
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - tree_sitter_install_needed
+        - not ansible_check_mode
+
+    - name: Remove temporary directory for tree-sitter install
+      ansible.builtin.file:
+        path: "{{ tree_sitter_tmpdir.path | default('/tmp') }}"
+        state: absent
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - tree_sitter_install_needed
+        - not ansible_check_mode
+
+    - name: Verify tree-sitter binary
+      ansible.builtin.command:
+        argv:
+          - "{{ home_dir }}/.local/bin/tree-sitter"
+          - --version
+      changed_when: false
+      check_mode: false
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - not ansible_check_mode or tree_sitter_version_check.rc == 0
+
+    - name: Install nvm
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+      args:
+        executable: /bin/bash
+        creates: "{{ home_dir }}/.nvm/nvm.sh"
+
+    - name: Install latest LTS Node.js with nvm
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export NVM_DIR="{{ home_dir }}/.nvm"
+        . "$NVM_DIR/nvm.sh"
+        nvm install --lts
+        nvm use 'lts/*'
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Install diff-highlight to local python prefix
+      ansible.builtin.command:
+        argv:
+          - pip3
+          - install
+          - --prefix
+          - "{{ home_dir }}/.local"
+          - diff-highlight
+      changed_when: false
+
+    - name: Configure PYTHONPATH for local site-packages
+      ansible.builtin.copy:
+        dest: "{{ home_dir }}/.zshrc.d/pythonpath"
+        mode: "0644"
+        content: |
+          export PYTHONPATH=~/.local/lib/python{{ ansible_facts.python.version.major }}.{{ ansible_facts.python.version.minor }}/site-packages
+
+    - name: Configure kubectl completion
+      ansible.builtin.copy:
+        dest: "{{ home_dir }}/.zshrc.d/kubectl-completion"
+        mode: "0644"
+        content: |
+          source <(kubectl completion zsh)
+
+    - name: Configure fzf completion
+      ansible.builtin.copy:
+        dest: "{{ home_dir }}/.zshrc.d/fzf-completion"
+        mode: "0644"
+        content: |
+          source <(fzf --zsh)
+
+    - name: Remove files/directories before linking
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ home_dir }}/.gitconfig"
+        - "{{ home_dir }}/.zshrc"
+        - "{{ home_dir }}/.aliases"
+        - "{{ home_dir }}/.gorc"
+        - "{{ home_dir }}/.config/nvim"
+        - "{{ home_dir }}/.tmux.conf"
+
+    - name: Ensure tmux plugins directory exists
+      ansible.builtin.file:
+        path: "{{ home_dir }}/.tmux/plugins"
+        state: directory
+        mode: "0755"
+
+    - name: Create symlinks for dotfiles
+      ansible.builtin.file:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        state: link
+        force: true
+      loop:
+        - src: "{{ dotfiles_root }}/git/config"
+          dest: "{{ home_dir }}/.gitconfig"
+        - src: "{{ dotfiles_root }}/zsh/zshrc"
+          dest: "{{ home_dir }}/.zshrc"
+        - src: "{{ dotfiles_root }}/zsh/aliases"
+          dest: "{{ home_dir }}/.aliases"
+        - src: "{{ dotfiles_root }}/zsh/gorc"
+          dest: "{{ home_dir }}/.gorc"
+        - src: "{{ dotfiles_root }}/nvim"
+          dest: "{{ home_dir }}/.config/nvim"
+        - src: "{{ dotfiles_root }}/tmux/tmux.conf"
+          dest: "{{ home_dir }}/.tmux.conf"
+
+    - name: Install tmux plugin manager
+      ansible.builtin.git:
+        repo: https://github.com/tmux-plugins/tpm
+        dest: "{{ home_dir }}/.tmux/plugins/tpm"
+        update: true
