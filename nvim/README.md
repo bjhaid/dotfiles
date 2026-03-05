@@ -7,5 +7,5 @@
    later.
 2. Clone this repository and copy this directory into `~/.config/nvim`.
 3. Opening neovim will automatically install the plugins. To updated the plugins
-   run `:PlugUpdate|q` in neovim.
+   run `:Lazy update` in neovim.
 4. Read the keybindings in `init.lua` to get started.
