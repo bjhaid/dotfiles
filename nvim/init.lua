@@ -13,40 +13,45 @@ vim.filetype.add({
   },
 })
 
-local Plug = vim.fn['plug#']
-vim.call('plug#begin')
-
-Plug('google/vim-jsonnet')
-Plug('pgr0ss/vim-github-url')
-Plug('scrooloose/nerdtree')
-Plug('tpope/vim-surround')
-Plug('junegunn/fzf', {
-  ['do'] = function()
-    vim.fn['fzf#install']()
-  end
-})
-Plug('ibhagwan/fzf-lua', { ['branch'] = 'main' })
-Plug('mfussenegger/nvim-dap') -- dependency for fzf-lua
-Plug('neovim/nvim-lspconfig')
-Plug('mason-org/mason.nvim')
-Plug('mason-org/mason-lspconfig.nvim')
-Plug('lukas-reineke/lsp-format.nvim')
-Plug('nvim-treesitter/nvim-treesitter', {
-  ['do'] = function()
-    vim.cmd('TSUpdate')
-  end
-})
-
--- copilot
-Plug('nvim-lua/plenary.nvim')
-Plug('CopilotC-Nvim/CopilotChat.nvim')
-
-vim.call('plug#end')
-
--- if no plugins are installed, install them.
-if vim.fn.isdirectory(vim.fn.stdpath("data") .. "/plugged") == 0 then
-  vim.cmd('PlugInstall|q')
+-- Bootstrap lazy.nvim
+local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+if not vim.loop.fs_stat(lazypath) then
+  vim.fn.system({
+    "git",
+    "clone",
+    "--filter=blob:none",
+    "https://github.com/folke/lazy.nvim.git",
+    "--branch=stable",
+    lazypath,
+  })
 end
+vim.opt.rtp:prepend(lazypath)
+
+-- Plugin specifications
+require("lazy").setup({
+  'google/vim-jsonnet',
+  'pgr0ss/vim-github-url',
+  'scrooloose/nerdtree',
+  'tpope/vim-surround',
+  {
+    'junegunn/fzf',
+    build = function()
+      vim.fn['fzf#install']()
+    end
+  },
+  { 'ibhagwan/fzf-lua', branch = 'main' },
+  'mfussenegger/nvim-dap',
+  'neovim/nvim-lspconfig',
+  'mason-org/mason.nvim',
+  'mason-org/mason-lspconfig.nvim',
+  'lukas-reineke/lsp-format.nvim',
+  {
+    'nvim-treesitter/nvim-treesitter',
+    build = ':TSUpdate',
+  },
+  'nvim-lua/plenary.nvim',
+  'CopilotC-Nvim/CopilotChat.nvim',
+})
 
 vim.opt.number = true
 vim.opt.showmatch = true
@@ -121,11 +126,32 @@ vim.lsp.config('*', {
 
 -- Treesitter setup
 local treesitter_parsers = { "bash", "diff", "dockerfile", "elixir", "go", "kotlin", "lua", "rego", "terraform" }
-require 'nvim-treesitter'.install(treesitter_parsers)
-vim.api.nvim_create_autocmd('FileType', {
-  pattern = treesitter_parsers,
-  callback = function() vim.treesitter.start() end,
-})
+local treesitter_ok, treesitter_configs = pcall(require, 'nvim-treesitter.configs')
+if treesitter_ok then
+  treesitter_configs.setup {
+    ensure_installed = treesitter_parsers,
+    highlight = {
+      enable = true,
+    },
+  }
+else
+  -- Fallback: install parsers and set up autocmd with safe error handling
+  local ts_ok, ts = pcall(require, 'nvim-treesitter')
+  if ts_ok then
+    ts.install(treesitter_parsers)
+  end
+
+  vim.api.nvim_create_autocmd('FileType', {
+    pattern = treesitter_parsers,
+    callback = function()
+      local lang = vim.bo.filetype
+      -- Check if parser is available before starting
+      if vim.treesitter.language.get_lang(lang) and pcall(vim.treesitter.get_parser, 0, lang) then
+        pcall(vim.treesitter.start)
+      end
+    end,
+  })
+end
 
 -- Copilot Chat
 require("CopilotChat").setup {
