@@ -43,6 +43,8 @@ ensure_ansible() {
     echo "error: ansible-playbook not found after bootstrap." >&2
     exit 1
   fi
+
+  hash -r
 }
 
 main() {
