@@ -9,23 +9,31 @@ ensure_ansible() {
     return 0
   fi
 
-  if [[ "$(uname)" == "Darwin" ]]; then
-    if ! command -v brew >/dev/null 2>&1; then
-      echo "error: Homebrew is required to install ansible on macOS." >&2
-      exit 1
-    fi
-    brew install ansible
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "error: python3 is required to install ansible-core via pipx." >&2
+    exit 1
+  fi
+
+  if ! python3 -m pip --version >/dev/null 2>&1; then
+    echo "error: python3 pip is required to install pipx." >&2
+    exit 1
+  fi
+
+  if ! command -v pipx >/dev/null 2>&1; then
+    python3 -m pip install --user pipx
+    export PATH="$HOME/.local/bin:$PATH"
+    python3 -m pipx ensurepath >/dev/null 2>&1 || true
+  fi
+
+  if ! command -v pipx >/dev/null 2>&1; then
+    echo "error: pipx not found after installation." >&2
+    exit 1
+  fi
+
+  if ! pipx list 2>/dev/null | grep -q "package ansible-core "; then
+    pipx install ansible-core
   else
-    if command -v apt-get >/dev/null 2>&1; then
-      sudo apt-get update
-      sudo apt-get install -y ansible
-    elif command -v pip3 >/dev/null 2>&1; then
-      pip3 install --user ansible
-      export PATH="$HOME/.local/bin:$PATH"
-    else
-      echo "error: unable to install ansible automatically (missing apt-get and pip3)." >&2
-      exit 1
-    fi
+    pipx upgrade ansible-core >/dev/null 2>&1 || true
   fi
 
   if ! command -v ansible-playbook >/dev/null 2>&1; then
