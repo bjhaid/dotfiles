@@ -61,7 +61,7 @@ git_status() {
   local branch=''
   local output=''
 
-  for line in "${(@f)$(git -C "$1" status --porcelain -b 2>/dev/null)}"
+  for line in "${(@f)$(git -C "$1" status --porcelain -b -uno 2>/dev/null)}"
   do
     case "$line" in
       \#\#*) branch="$(git_branch "$1" "$line")" ;;
@@ -145,9 +145,6 @@ for file in $(find ~/.zshrc.d -type f -or -type l) ; do
 done
 
 [[ -s "$HOME/.gorc" ]] && source "$HOME/.gorc"
-export NVM_DIR="$HOME/.nvm"
-[[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
-
 
 # This makes Control+U delete all characters before the cursor
 bindkey \^U backward-kill-line
