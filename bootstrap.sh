@@ -2,9 +2,33 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-export PATH="$HOME/.local/bin:$PATH"
+
+prepend_path() {
+  local dir="$1"
+
+  if [[ -n "$dir" && -d "$dir" && ":$PATH:" != *":$dir:"* ]]; then
+    export PATH="$dir:$PATH"
+  fi
+}
+
+python_user_bin() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local user_base
+  user_base="$(python3 -m site --user-base 2>/dev/null)" || return 1
+  if [[ -n "$user_base" ]]; then
+    printf '%s/bin\n' "$user_base"
+  fi
+}
+
+prepend_path "$HOME/.local/bin"
+prepend_path "$(python_user_bin || true)"
 
 ensure_ansible() {
+  local pipx_cmd=(python3 -m pipx)
+
   if command -v ansible-playbook >/dev/null 2>&1; then
     return 0
   fi
@@ -21,23 +45,28 @@ ensure_ansible() {
 
   if ! command -v pipx >/dev/null 2>&1; then
     python3 -m pip install --user pipx
-    export PATH="$HOME/.local/bin:$PATH"
+    prepend_path "$(python_user_bin || true)"
     python3 -m pipx ensurepath >/dev/null 2>&1 || true
+    hash -r
   fi
 
-  if ! command -v pipx >/dev/null 2>&1; then
-    echo "error: pipx not found after installation." >&2
+  if command -v pipx >/dev/null 2>&1; then
+    pipx_cmd=(pipx)
+  fi
+
+  if ! "${pipx_cmd[@]}" --version >/dev/null 2>&1; then
+    echo "error: pipx could not be executed after installation." >&2
     exit 1
   fi
 
-  if ! pipx list 2>/dev/null | grep -q "package ansible-core "; then
-    pipx install ansible-core
+  if ! "${pipx_cmd[@]}" list 2>/dev/null | grep -q "package ansible-core "; then
+    "${pipx_cmd[@]}" install ansible-core
   else
-    pipx upgrade ansible-core >/dev/null 2>&1 || true
+    "${pipx_cmd[@]}" upgrade ansible-core >/dev/null 2>&1 || true
   fi
 
   if ! command -v ansible-playbook >/dev/null 2>&1; then
-    export PATH="$HOME/.local/bin:$PATH"
+    prepend_path "$HOME/.local/bin"
   fi
   if ! command -v ansible-playbook >/dev/null 2>&1; then
     echo "error: ansible-playbook not found after bootstrap." >&2

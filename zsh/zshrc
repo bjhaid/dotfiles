@@ -160,3 +160,11 @@ bindkey '^W' my-backward-kill-word
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+if command -v python3 >/dev/null 2>&1; then
+    _python_user_bin="$(python3 -m site --user-base 2>/dev/null)/bin"
+    if [ -d "$_python_user_bin" ]; then
+        export PATH="$PATH:$_python_user_bin"
+    fi
+    unset _python_user_bin
+fi
