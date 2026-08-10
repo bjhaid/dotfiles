@@ -470,6 +470,57 @@
         - ansible_facts.system in ["Linux", "Darwin"]
         - not ansible_check_mode or delta_version_check.rc == 0
 
+    - name: Set starpls release facts for Intel macOS
+      ansible.builtin.set_fact:
+        starpls_version: "0.1.22"
+        starpls_asset_name: starpls-darwin-amd64
+      when:
+        - ansible_facts.system == "Darwin"
+        - ansible_facts.architecture in ["x86_64", "amd64"]
+
+    - name: Check installed starpls version
+      ansible.builtin.command:
+        argv:
+          - "{{ home_dir }}/.local/bin/starpls"
+          - version
+      register: starpls_version_check
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      when:
+        - ansible_facts.system == "Darwin"
+        - ansible_facts.architecture in ["x86_64", "amd64"]
+
+    - name: Determine whether starpls install/update is needed
+      ansible.builtin.set_fact:
+        starpls_install_needed: "{{ starpls_version_check.rc != 0 or ('v' ~ starpls_version) not in starpls_version_check.stdout }}"
+      when:
+        - ansible_facts.system == "Darwin"
+        - ansible_facts.architecture in ["x86_64", "amd64"]
+
+    - name: Install starpls binary on Intel macOS
+      ansible.builtin.get_url:
+        url: "https://github.com/withered-magic/starpls/releases/download/v{{ starpls_version }}/{{ starpls_asset_name }}"
+        dest: "{{ home_dir }}/.local/bin/starpls"
+        mode: "0755"
+      when:
+        - ansible_facts.system == "Darwin"
+        - ansible_facts.architecture in ["x86_64", "amd64"]
+        - starpls_install_needed
+        - not ansible_check_mode
+
+    - name: Verify starpls binary
+      ansible.builtin.command:
+        argv:
+          - "{{ home_dir }}/.local/bin/starpls"
+          - version
+      changed_when: false
+      check_mode: false
+      when:
+        - ansible_facts.system == "Darwin"
+        - ansible_facts.architecture in ["x86_64", "amd64"]
+        - not ansible_check_mode or starpls_version_check.rc == 0
+
     - name: Fetch latest tree-sitter release metadata
       ansible.builtin.uri:
         url: https://api.github.com/repos/tree-sitter/tree-sitter/releases/latest

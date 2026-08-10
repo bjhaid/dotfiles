@@ -3,7 +3,7 @@
 ## Installation | Usage
 
 1. Download neovim from [neovim releases
-   page](https://github.com/neovim/neovim/releases), requires version 0.10.0 or
+   page](https://github.com/neovim/neovim/releases), requires version 0.11.0 or
    later.
 2. Clone this repository and copy this directory into `~/.config/nvim`.
 3. Opening neovim will automatically install the plugins. To updated the plugins

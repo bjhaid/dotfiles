@@ -94,13 +94,24 @@ vim.opt.undofile = true
 local servers = { "lua_ls", "gopls", "elixirls", "bashls", "terraformls", "kotlin_language_server", "jsonnet_ls",
   "yamlls", "helm_ls", "starpls" }
 
+local uname = uv.os_uname()
+local is_darwin_x86 = uname.sysname == "Darwin" and (uname.machine == "x86_64" or uname.machine == "amd64")
+local mason_servers = vim.tbl_filter(function(server)
+  return not (is_darwin_x86 and server == "starpls")
+end, servers)
+
 require("mason").setup()
 require("mason-lspconfig").setup {
-  ensure_installed = servers
+  ensure_installed = mason_servers,
+  automatic_enable = false,
 }
 vim.lsp.config('elixirls', {
   cmd = { "~/.local/share/nvim/mason/packages/elixir-ls/language_server.sh" },
 })
+vim.lsp.config('starpls', {
+  cmd = { "starpls", "server" },
+})
+vim.lsp.enable(servers)
 
 if vim.fn.isdirectory("/home/owner/src/kotlin-bazel.nvim") ~= 0 then
   vim.opt.rtp:append("/home/owner/src/kotlin-bazel.nvim")
