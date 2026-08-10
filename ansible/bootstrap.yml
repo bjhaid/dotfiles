@@ -333,9 +333,14 @@
         creates: "{{ home_dir }}/.local/bin/fzf"
       when: ansible_facts.system != "Darwin"
 
-    - name: Fetch latest git-delta release metadata
+    - name: Set git-delta release tag
+      ansible.builtin.set_fact:
+        delta_release_tag: "{{ '0.18.2' if (ansible_facts.system == 'Darwin' and ansible_facts.architecture in ['x86_64', 'amd64']) else 'latest' }}"
+      when: ansible_facts.system in ["Linux", "Darwin"]
+
+    - name: Fetch git-delta release metadata
       ansible.builtin.uri:
-        url: https://api.github.com/repos/dandavison/delta/releases/latest
+        url: "{{ 'https://api.github.com/repos/dandavison/delta/releases/latest' if delta_release_tag == 'latest' else 'https://api.github.com/repos/dandavison/delta/releases/tags/' ~ delta_release_tag }}"
         return_content: true
       register: delta_release
       changed_when: false
@@ -361,9 +366,26 @@
         - ansible_facts.system in ["Linux", "Darwin"]
         - delta_asset_name == "unsupported"
 
+    - name: Set git-delta matching release assets
+      ansible.builtin.set_fact:
+        delta_asset_matches: "{{ delta_release.json.assets | selectattr('name', 'equalto', delta_asset_name) | list }}"
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - delta_asset_name != "unsupported"
+
+    - name: Fail when git-delta release asset is unavailable
+      ansible.builtin.fail:
+        msg: >-
+          git-delta release {{ delta_release.json.tag_name }} does not include
+          expected asset {{ delta_asset_name }}.
+      when:
+        - ansible_facts.system in ["Linux", "Darwin"]
+        - delta_asset_name != "unsupported"
+        - delta_asset_matches | length == 0
+
     - name: Set git-delta selected release asset
       ansible.builtin.set_fact:
-        delta_asset: "{{ (delta_release.json.assets | selectattr('name', 'equalto', delta_asset_name) | list | first) }}"
+        delta_asset: "{{ delta_asset_matches | first }}"
       when:
         - ansible_facts.system in ["Linux", "Darwin"]
         - delta_asset_name != "unsupported"
